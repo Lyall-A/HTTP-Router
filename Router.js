@@ -37,7 +37,7 @@ class Router {
 
     createMethod(method) {
         /**
-         * 
+         * Listens for requests
          * @param {string} path URL path
          * @param {(req: http.IncomingMessage, res: http.ServerResponse, next: () => void, params: object, listener: object) => void} handler Listener handler
          */
@@ -58,13 +58,12 @@ class Router {
 
     getPath = (url) => {
         let path = url.split("?")[0];
-        if (this._options?.ignoreRepeatedSlashes) path = path.replace(/\/+/g, "/");
+        if (this._options.ignoreRepeatedSlashes) path = path.replace(/\/+/g, "/");
         // if (!path.endsWith("/")) path += "/";
         return path;
     }
 
-    // static pathRegex = /(?<!\\\\)((?<any>\\\*)|:{(?<enclosed_param>.+?)}|:(?!\\{[^}]\})(?<param>[^/]+))/g;
-    static pathRegex = /(?<!\\\\)((\\\*)|:{(.+?)}|:(?!\\{[^}]\})([^/]+))/g;
+    static pathRegex = /(?<!\\\\)((?<any>\\\*)|:{(?<enclosed_param>.+?)}|:(?!\\{[^}]\})(?<param>[^/]+))/g;
 
     static createPathRegex = (path) => {
         // NOTE: no trailing slash means that there can be paths after, eg. /hello will match /hello and /hello/WORLD/ANYTHING
@@ -89,7 +88,7 @@ class Router {
     static getParams = (match, listener) => {
         if (typeof listener.path !== "string") return { };
         const groups = match.slice(1);
-        const params = Object.fromEntries(listener.paramNames.map((name, index) => name !== null ? [name, groups[index]] : null).filter(i => i !== null));
+        return Object.fromEntries(listener.paramNames.map((name, index) => name !== null ? [name, groups[index]] : null).filter(i => i !== null));
     }
 }
 

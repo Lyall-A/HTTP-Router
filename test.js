@@ -3,10 +3,34 @@ const Server = require("./Server");
 const server = new Server();
 
 server.get("/", (req, res) => {
+    console.log(`${req.ip} visiting ${req.path}, query: ${JSON.stringify(req.query)}, params: ${JSON.stringify(req.params)}`);
     res.html("<center>hi</center>");
+    // res.json({ hello: "world" });
+    // res.send("Hi");
+});
+
+server.get("/:thing", (req, res, next, params) => {
+    res.html(`<center>${decodeURIComponent(params.thing)}</center>`);
 });
 
 server.listen(6969, () => console.log("Listening <http://localhost:6969>"));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

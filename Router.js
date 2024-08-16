@@ -1,8 +1,12 @@
 const http = require("http");
 
+const { escapeRegex, objectDefaults } = require("./utils");
+
 class Router {
-    constructor(options = { }) {
-        this._options = options;
+    constructor(options) {
+        this._options = objectDefaults(options, {
+            ignoreRepeatedSlashes: true
+        });
         this._listeners = [];
     }
 
@@ -86,10 +90,6 @@ class Router {
         const groups = match.slice(1);
         const params = Object.fromEntries(listener.paramNames.map((name, index) => name !== null ? [name, groups[index]] : null).filter(i => i !== null));
     }
-}
-
-function escapeRegex(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 module.exports = Router;

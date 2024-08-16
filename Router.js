@@ -17,7 +17,7 @@ class Router {
         for (const listener of listeners) {
             const match = path.match(listener.regex);
             if (!match) continue;
-            const params = this.getParams(match, listener);
+            const params = Router.getParams(match, listener);
             let next = false;
             await listener.handler(req, res, () => next = true, params, listener);
             if (next) continue; else break;
@@ -47,16 +47,14 @@ class Router {
             const listenerIndex = this._listeners.push({
                 path,
                 handler,
-                regex: path instanceof RegExp ? path : this.createPathRegex(path),
-                paramNames: this.getParamNames(path),
+                regex: path instanceof RegExp ? path : Router.createPathRegex(path),
+                paramNames: Router.getParamNames(path),
                 method: method?.toUpperCase()
             }) - 1;
     
             return () => this._listeners[listenerIndex] = null;
         }
     }
-
-    pathRegex = /(?<!\\\\)((?<any>\\\*)|:{(?<enclosed_param>.+?)}|:(?!\\{[^}]\})(?<param>[^/]+))/g;
 
     getPath = (url) => {
         let path = url.split("?")[0];
@@ -65,7 +63,10 @@ class Router {
         return path;
     }
 
-    createPathRegex = (path) => {
+    // static pathRegex = /(?<!\\\\)((?<any>\\\*)|:{(?<enclosed_param>.+?)}|:(?!\\{[^}]\})(?<param>[^/]+))/g;
+    static pathRegex = /(?<!\\\\)((\\\*)|:{(.+?)}|:(?!\\{[^}]\})([^/]+))/g;
+
+    static createPathRegex = (path) => {
         // NOTE: no trailing slash means that there can be paths after, eg. /hello will match /hello and /hello/WORLD/ANYTHING
     
         // /hello/world = /hello/world/ANY/THING
@@ -80,12 +81,12 @@ class Router {
         return new RegExp(`^${escapeRegex(path).replace(this.pathRegex, "([^/]+)")}${path.endsWith("/") ? "?$" : "(?<end>$|\/.*)"}`.replace(/\\\\/g, ""));
     }
 
-    getParamNames = (path) => {
+    static getParamNames = (path) => {
         if (typeof path !== "string") return { };
         return Array.from(escapeRegex(path).matchAll(this.pathRegex)).map(i => !i.groups.any ? i[4] : null);
     }
 
-    getParams = (match, listener) => {
+    static getParams = (match, listener) => {
         if (typeof listener.path !== "string") return { };
         const groups = match.slice(1);
         const params = Object.fromEntries(listener.paramNames.map((name, index) => name !== null ? [name, groups[index]] : null).filter(i => i !== null));
@@ -93,23 +94,3 @@ class Router {
 }
 
 module.exports = Router;
-
-// createPathRegex TESTS
-// createPathRegex("/:hi/:hi2/:hi3/*")
-// console.log(createPathRegex("/hello/world").test("/hello/world") === true)
-// console.log(createPathRegex("/hello/world").test("/hello/worldworld") === false)
-// console.log(createPathRegex("/hello/world").test("/hello/world/") === true)
-// console.log(createPathRegex("/hello/world").test("/hello/world/world") === true)
-// console.log(createPathRegex("/hello/world/").test("/hello/world/world") === false)
-// console.log(createPathRegex("/hello/world/").test("/hello/world/") === true)
-// console.log(createPathRegex("/hello/world/*").test("/hello/world/hi/hi") === true)
-// console.log(createPathRegex("/hello/world/*/").test("/hello/world/hi/hi") === false)
-// console.log(createPathRegex("/hello/world/*/:a").test("/hello/world/hi/hi") === true)
-// console.log(createPathRegex("/hello/world/*/:a").test("/hello/world/hi/hi/hi") === true)
-// console.log(createPathRegex("/hello/world/*/:a/").test("/hello/world/hi/hi/hi") === false)
-// console.log(createPathRegex("/hello/world/*/:{a}/").test("/hello/world/hi/hi/") === true)
-// console.log(createPathRegex("/hello/world/*/:{}/").test("/hello/world/hi/hi/") === false)
-// console.log(createPathRegex("/hello/world/*/:{}/").test("/hello/world/hi/:{}/") === true)
-// console.log(createPathRegex("/hello/world/\\*/").test("/hello/world/*") === true)
-// console.log(createPathRegex("/hello/world/\\:test/").test("/hello/world/:test") === true)
-// console.log(createPathRegex("/hello/world/\\:{test}/").test("/hello/world/:{test}") === true)

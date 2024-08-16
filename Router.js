@@ -1,82 +1,101 @@
+const http = require("http");
+
 class Router {
-    constructor() {
-        this.listeners = [];
+    constructor(options = { }) {
+        this._options = options;
+        this._listeners = [];
     }
 
     route = async (req, res) => {
-        const listeners = this.listeners.filter(i => i && (!i.method || i.method === req.method));
-        const path = getPath(req.url);
+        const listeners = this._listeners.filter(i => i && (!i.method || i.method === req.method));
+        const path = this.getPath(req.url);
 
         for (const listener of listeners) {
             const match = path.match(listener.regex);
             if (!match) continue;
-            const groups = match.slice(1);
-            const params = Object.fromEntries(listener.paramNames.map((name, index) => name !== null ? [name, groups[index]] : null).filter(i => i !== null));
+            const params = this.getParams(match, listener);
             let next = false;
-            await listener.callback(req, res, () => next = true, params, listener);
+            await listener.handler(req, res, () => next = true, params, listener);
             if (next) continue; else break;
         }
     }
 
-    any = (path, callback) => { return this.createListener(path, callback) };
-    get = (path, callback) => { return this.createListener(path, callback, "get") };
-    head = (path, callback) => { return this.createListener(path, callback, "head") };
-    post = (path, callback) => { return this.createListener(path, callback, "post") };
-    put = (path, callback) => { return this.createListener(path, callback, "put") };
-    delete = (path, callback) => { return this.createListener(path, callback, "delete") };
-    connect = (path, callback) => { return this.createListener(path, callback, "connect") };
-    options = (path, callback) => { return this.createListener(path, callback, "options") };
-    trace = (path, callback) => { return this.createListener(path, callback, "trace") };
-    patch = (path, callback) => { return this.createListener(path, callback, "patch") };
+    any = this.createMethod();
+    get = this.createMethod("get");
+    head = this.createMethod("head");
+    post = this.createMethod("post");
+    put = this.createMethod("put");
+    delete = this.createMethod("delete");
+    connect = this.createMethod("connect");
+    options = this.createMethod("options");
+    trace = this.createMethod("trace");
+    patch = this.createMethod("patch");
 
-    createListener = (path, callback, method) => {
-        const listenerIndex = this.listeners.push({
-            path,
-            callback,
-            regex: path instanceof RegExp ? path : createPathRegex(path),
-            paramNames: getParamNames(path),
-            method: method?.toUpperCase()
-        }) - 1;
+    createMethod(method) {
+        /**
+         * 
+         * @param {string} path URL path
+         * @param {(req: http.IncomingMessage, res: http.ServerResponse, next: () => void, params: object, listener: object) => void} handler Listener handler
+         */
+        return (path, handler) => {
+            if (path === "*") path = /./; // Replace path with regex /./ if equals '*'
 
-        return () => this.listeners[listenerIndex] = null;
+            const listenerIndex = this._listeners.push({
+                path,
+                handler,
+                regex: path instanceof RegExp ? path : this.createPathRegex(path),
+                paramNames: this.getParamNames(path),
+                method: method?.toUpperCase()
+            }) - 1;
+    
+            return () => this._listeners[listenerIndex] = null;
+        }
     }
-}
 
-const pathRegex = /(?<!\\\\)((?<any>\\\*)|:{(?<enclosed_param>.+?)}|:(?!\\{[^}]\})(?<param>[^/]+))/g;
+    pathRegex = /(?<!\\\\)((?<any>\\\*)|:{(?<enclosed_param>.+?)}|:(?!\\{[^}]\})(?<param>[^/]+))/g;
 
-function createPathRegex(path) {
-    // NOTE: no trailing slash means that there can be paths after, eg. /hello will match /hello and /hello/WORLD/ANYTHING
+    getPath = (url) => {
+        let path = url.split("?")[0];
+        if (this._options?.ignoreRepeatedSlashes) path = path.replace(/\/+/g, "/");
+        // if (!path.endsWith("/")) path += "/";
+        return path;
+    }
 
-    // /hello/world = /hello/world/ANY/THING
-    // /hello/world/ = /hello/world
-    // /hello/*/ = /hello/ANYTHING
-    // /hello/hi-*/ = /hello/hi-ANYTHING
-    // /hello/hi-*-hru/ = /hello/hi-ANYTHING-hru
-    // /hello/:name/ = /hello/ANYTHING (with "name" parameter)
-    // /hello/hi-:{name}-hru/ = /hello/hi-ANYTHING-hru (with "name" parameter)
-    // /hello/hi-:name/ = /hello/hi-ANYTHING (with "name" parameter)
+    createPathRegex = (path) => {
+        // NOTE: no trailing slash means that there can be paths after, eg. /hello will match /hello and /hello/WORLD/ANYTHING
+    
+        // /hello/world = /hello/world/ANY/THING
+        // /hello/world/ = /hello/world
+        // /hello/*/ = /hello/ANYTHING
+        // /hello/hi-*/ = /hello/hi-ANYTHING
+        // /hello/hi-*-hru/ = /hello/hi-ANYTHING-hru
+        // /hello/:name/ = /hello/ANYTHING (with "name" parameter)
+        // /hello/hi-:{name}-hru/ = /hello/hi-ANYTHING-hru (with "name" parameter)
+        // /hello/hi-:name/ = /hello/hi-ANYTHING (with "name" parameter)
+        
+        return new RegExp(`^${escapeRegex(path).replace(this.pathRegex, "([^/]+)")}${path.endsWith("/") ? "?$" : "(?<end>$|\/.*)"}`.replace(/\\\\/g, ""));
+    }
 
-    return new RegExp(`^${escapeRegex(path).replace(pathRegex, "([^/]+)")}${path.endsWith("/") ? "?$" : "(?<end>$|\/.*)"}`.replace(/\\\\/g, ""));
-}
+    getParamNames = (path) => {
+        if (typeof path !== "string") return { };
+        return Array.from(escapeRegex(path).matchAll(this.pathRegex)).map(i => !i.groups.any ? i[4] : null);
+    }
 
-function getParamNames(path) {
-    return Array.from(escapeRegex(path).matchAll(pathRegex)).map(i => !i.groups.any ? i[4] : null);
+    getParams = (match, listener) => {
+        if (typeof listener.path !== "string") return { };
+        const groups = match.slice(1);
+        const params = Object.fromEntries(listener.paramNames.map((name, index) => name !== null ? [name, groups[index]] : null).filter(i => i !== null));
+    }
 }
 
 function escapeRegex(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function getPath(url) {
-    let path = url.split("?")[0];
-    // if (!path.endsWith("/")) path += "/";
-    return path;
-}
-
 module.exports = Router;
 
 // createPathRegex TESTS
-createPathRegex("/:hi/:hi2/:hi3/*")
+// createPathRegex("/:hi/:hi2/:hi3/*")
 // console.log(createPathRegex("/hello/world").test("/hello/world") === true)
 // console.log(createPathRegex("/hello/world").test("/hello/worldworld") === false)
 // console.log(createPathRegex("/hello/world").test("/hello/world/") === true)

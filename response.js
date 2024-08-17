@@ -8,7 +8,15 @@ function parse(raw) {
     }
 
     parsed.sendStatus = (status, message) => {
-        parsed.setStatus(status, message);
+        if (status) raw.statusCode = status;
+        if (message) raw.statusMessage = message;
+        raw.end();
+        return parsed;
+    }
+
+    parsed.redirect = (location, permanent) => {
+        raw.statusCode = permanent ? 301 : 302;
+        raw.setHeader("Location", location);
         raw.end();
         return parsed;
     }

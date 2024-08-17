@@ -11,7 +11,7 @@ class Server {
         this._options = objectDefaults(options, {
             server: null, // The HTTP server
             router: null, // The router for the server
-            routerOptions: null, // Router options
+            routerOptions: null, // Router options, can be array to create multiple routers
             serverOptions: null, // Server options
             noRouter: false, // Don't create router
             noRequestEvent: false, // Don't create the request event for router
@@ -22,13 +22,33 @@ class Server {
         });
 
         this.server = this._options.server || ((this._options.tls && this._options.key && this._options.cert) ? https : http).createServer({ key: this._options.key, cert: this._options.cert, ...this._options.serverOptions });
-        this.router = this._options.router || !this._options.noRouter ? new Router(this._options.routerOptions) : null;
+        this.router = this._options.router;
+        this.routers = [this.router];
 
-        // Setup router
-        if (!this._options.noRequestEvent && this.router) this.createRequestEvent();
-        
-        // Modify req and res
-        if (!this._options.noCustomRoute && this.router) this.createCustomRoute();
+        if (!this.router && !this._options.noRouter) {
+            if (this._options.routerOptions instanceof Array) {
+                // Create multiple routers, 1st being this.router
+                this._options.routerOptions.forEach((routerOptions, index) => {
+                    const router = new Router(routerOptions);
+                    if (!index) {
+                        this.router = router;
+                        this.routers = [this.router];
+                    } else this.routers.push(router);
+                    // Setup router
+                    if (!this._options.noRequestEvent) this.createRequestEvent(router);
+                    // Modify req and res
+                    if (!this._options.noCustomRoute) this.createCustomRoute(router);
+                });
+            } else {
+                // Create 1 router
+                this.router = new Router(this._options.routerOptions);
+                this.routers = [this.router];
+                // Setup router
+                if (!this._options.noRequestEvent && this.router) this.createRequestEvent();
+                // Modify req and res
+                if (!this._options.noCustomRoute && this.router) this.createCustomRoute();
+            }
+        }
     }
 
     // Router

@@ -5,14 +5,20 @@ const { escapeRegex, objectDefaults } = require("./utils");
 class Router {
     constructor(options) {
         this._options = objectDefaults(options, {
-            ignoreRepeatedSlashes: true
+            ignoreRepeatedSlashes: true,
+            server: null,
+            root: null,
+            ignoreRoot: null
         });
         this._listeners = [];
+
+        if (this._options.server) this._options.server?.on("request", this.route);
     }
 
     route = async (req, res) => {
-        const listeners = this._listeners.filter(i => i && (!i.method || i.method === req.method));
         const path = this.getPath(req.url);
+        if (this._options.ignoreRoot && (this._options.ignoreRoot instanceof Array ? this._options.ignoreRoot.find(i => path.match(new RegExp(i instanceof RegExp ? i.source : Router.createPathRegex(i)))) : path.match(new RegExp(this._options.ignoreRoot instanceof RegExp ? this._options.ignoreRoot.source : Router.createPathRegex(this._options.ignoreRoot))))) return;
+        const listeners = this._listeners.filter(i => i && (!i.method || i.method === req.method));
 
         for (const listener of listeners) {
             const match = path.match(listener.regex);
@@ -42,30 +48,40 @@ class Router {
          * @param {(req: http.IncomingMessage, res: http.ServerResponse, next: () => void, params: object, listener: object) => void} handler Listener handler
          */
         return (path, handler) => {
-            if (path === "*") path = /./; // Replace path with regex /./ if equals '*'
+            const paths = path instanceof Array ? path : [path];
+            const returns = [];
+            for (let path of paths) {
+                if (path === "*" || !path) path = Router.pathEnd; // Replace path with regex if equals '*'
+                let regex = new RegExp(`${this._options.root ? this._options.root instanceof RegExp ? this._options.root.source : Router.createPathRegex(this._options.root, false, true).source : ""}${path instanceof RegExp ? path.source : Router.createPathRegex(path, this._options.root ? true : false).source}`);
 
-            const listenerIndex = this._listeners.push({
-                path,
-                handler,
-                regex: path instanceof RegExp ? path : Router.createPathRegex(path),
-                paramNames: Router.getParamNames(path),
-                method: method?.toUpperCase()
-            }) - 1;
-    
-            return () => this._listeners[listenerIndex] = null;
+                const listenerIndex = this._listeners.push({
+                    path,
+                    handler,
+                    regex,
+                    paramNames: [
+                        ...Router.getParamNames(this._options.root),
+                        ...Router.getParamNames(path)
+                    ],
+                    method: method?.toUpperCase()
+                }) - 1;
+                
+                returns.push(() => this._listeners[listenerIndex] = null);
+            }
+            return typeof path === "object" ? returns : returns[0];
         }
     }
 
     getPath = (url) => {
         let path = url.split("?")[0];
         if (this._options.ignoreRepeatedSlashes) path = path.replace(/\/+/g, "/");
-        // if (!path.endsWith("/")) path += "/";
         return path;
     }
 
+    static pathGroupRegex = /([^/]+)/;
     static pathRegex = /(?<!\\\\)((?<any>\\\*)|:{(?<enclosed_param>.+?)}|:(?!\\{[^}]\})(?<param>[^/]+))/g;
+    static pathEnd = /(?<end>$|\/.*)/;
 
-    static createPathRegex = (path) => {
+    static createPathRegex = (path, noStart, noEnd) => {
         // NOTE: no trailing slash means that there can be paths after, eg. /hello will match /hello and /hello/WORLD/ANYTHING
     
         // /hello/world = /hello/world/ANY/THING
@@ -77,11 +93,11 @@ class Router {
         // /hello/hi-:{name}-hru/ = /hello/hi-ANYTHING-hru (with "name" parameter)
         // /hello/hi-:name/ = /hello/hi-ANYTHING (with "name" parameter)
         
-        return new RegExp(`^${escapeRegex(path).replace(this.pathRegex, "([^/]+)")}${path.endsWith("/") ? "?$" : "(?<end>$|\/.*)"}`.replace(/\\\\/g, ""));
+        return new RegExp(`${!noStart ? "^" : ""}${escapeRegex(path).replace(this.pathRegex, this.pathGroupRegex.source)}${!noEnd ? path.endsWith("/") ? "?$" : this.pathEnd.source : ""}`.replace(/\\\\/g, ""));
     }
 
     static getParamNames = (path) => {
-        if (typeof path !== "string") return { };
+        if (typeof path !== "string") return [ ];
         return Array.from(escapeRegex(path).matchAll(this.pathRegex)).map(i => !i.groups.any ? i[4] : null);
     }
 

@@ -1,5 +1,11 @@
 function parse(raw) {
     const parsed = { };
+
+    parsed.setStatus = (status, statusMessage) => {
+        if (status) raw.statusCode = status;
+        if (statusMessage) raw.statusMessage = statusMessage;
+        return parsed;
+    }
     
     parsed.send = (data, contentType = "text/plain") => {
         if (contentType) raw.setHeader("Content-Type", contentType);

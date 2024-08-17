@@ -11,6 +11,9 @@ class Server {
         this._options = objectDefaults(options, {
             server: null, // The HTTP server
             router: null, // The router for the server
+            routerOptions: null, // Router options
+            serverOptions: null, // Server options
+            noRouter: false, // Don't create router
             noRequestEvent: false, // Don't create the request event for router
             noCustomRoute: false, // Don't create custom route for every request
             tls: false, // Enable TLS for HTTPS
@@ -19,17 +22,13 @@ class Server {
         });
 
         this.server = this._options.server || ((this._options.tls && this._options.key && this._options.cert) ? https : http).createServer({ key: this._options.key, cert: this._options.cert, ...this._options.serverOptions });
-        this.router = this._options.router || new Router();
+        this.router = this._options.router || !this._options.noRouter ? new Router(this._options.routerOptions) : null;
 
         // Setup router
-        if (!this._options.noRequestEvent) this.server.on("request", this.router.route);
+        if (!this._options.noRequestEvent && this.router) this.createRequestEvent();
         
         // Modify req and res
-        if (!this._options.noCustomRoute) this.router.any("*", (req, res, next, params) => {
-            request.apply(req, req);
-            response.apply(res, res);
-            next();
-        });
+        if (!this._options.noCustomRoute && this.router) this.createCustomRoute();
     }
 
     // Router
@@ -44,8 +43,23 @@ class Server {
     trace = (...args) => this.router.trace(...args);
     patch = (...args) => this.router.patch(...args);
 
-    // Listen
+    // Server
+    on = (...args) => this.server.on(...args);
+    once = (...args) => this.server.once(...args);
     listen = (...args) => this.server.listen(...args);
+
+    // Others
+    createRequestEvent(router = this.router) {
+        this.server.on("request", router.route);
+    }
+
+    createCustomRoute(router = this.router) {
+        router.any("*", (req, res, next) => {
+            request.apply(req, req);
+            response.apply(res, res);
+            next();
+        });
+    }
 }
 
 module.exports = Server;

@@ -8,7 +8,8 @@ function parse(raw) {
     }
 
     parsed.sendStatus = (status, message) => {
-        parsed.setStatus(status, message).end();
+        parsed.setStatus(status, message);
+        raw.end();
         return parsed;
     }
 

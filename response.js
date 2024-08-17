@@ -1,12 +1,17 @@
 function parse(raw) {
     const parsed = { };
 
-    parsed.setStatus = (status, statusMessage) => {
+    parsed.setStatus = (status, message) => {
         if (status) raw.statusCode = status;
-        if (statusMessage) raw.statusMessage = statusMessage;
+        if (message) raw.statusMessage = message;
         return parsed;
     }
-    
+
+    parsed.sendStatus = (status, message) => {
+        parsed.setStatus(status, message).end();
+        return parsed;
+    }
+
     parsed.send = (data, contentType = "text/plain") => {
         if (contentType) raw.setHeader("Content-Type", contentType);
         raw.end(data);

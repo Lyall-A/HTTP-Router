@@ -3,7 +3,7 @@ function escapeRegex(string) {
 }
 
 function objectDefaults(obj, def) {
-    if (typeof obj !== "object") return def;
+    if (obj === null || typeof obj !== "object") return def;
     
     return (function checkEntries(object = obj, defaultObj = def) {
         Object.entries(defaultObj).forEach(([key, value]) => {

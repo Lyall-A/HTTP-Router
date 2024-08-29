@@ -78,7 +78,7 @@ class Router {
     }
 
     static pathGroupRegex = /([^/]+)/;
-    static pathRegex = /(?<!\\\\)((?<any>\\\*)|:{(?<enclosed_param>.+?)}|:(?!\\{[^}]\})(?<param>[^/]+))/g;
+    static pathRegex = /(?<any>\\\*)|:\\{(?<enclosed_param>.+?)\\}|:(?!\\{.*?\\})(?<param>[^/]+)/g;
     static pathEnd = /(?<end>$|\/.*)/;
 
     static createPathRegex = (path, noStart, noEnd) => {
@@ -98,7 +98,7 @@ class Router {
 
     static getParamNames = (path) => {
         if (typeof path !== "string") return [ ];
-        return Array.from(escapeRegex(path).matchAll(this.pathRegex)).map(i => !i.groups.any ? i[4] : null);
+        return Array.from(escapeRegex(path).matchAll(this.pathRegex)).map(i => i.groups.param || i.groups.enclosed_param || null);
     }
 
     static getParams = (match, listener) => {

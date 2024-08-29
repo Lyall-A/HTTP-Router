@@ -9,6 +9,12 @@ server.get("/", (req, res) => {
     // res.send("Hi");
 });
 
+// server.get("/:{thisIsBroken}.txt/", (req, res, next, params) => {
+//     console.log(params)
+//     res.send("hi")
+// });
+// console.log(server.router)
+
 server.get("/:thing", (req, res, next, params) => {
     res.html(`<center>${decodeURIComponent(params.thing)}</center>`);
 });

@@ -9,6 +9,16 @@ server.get("/", (req, res) => {
     // res.send("Hi");
 });
 
+server.get("/test", (req, res) => {
+    console.log(res.writeLarge("hi"));
+    console.log(res.writeLarge("hi"));
+    console.log(res.writeLarge("hi".repeat(5000000)));
+    console.log(res.writeLarge("hi"));
+    console.log(res.writeLarge("hi".repeat(5000000)));
+    console.log(res.writeLarge("hi"));
+    console.log(res.writeLarge("hi"));
+});
+
 // server.get("/:{thisIsBroken}.txt/", (req, res, next, params) => {
 //     console.log(params)
 //     res.send("hi")

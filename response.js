@@ -39,6 +39,28 @@ function parse(raw) {
         return parsed;
     }
 
+    parsed.writeQueue = [];
+    parsed.writing = false;
+
+    parsed.writeLarge = (chunk) => {
+        if (parsed.writing) {
+            parsed.writeQueue.push(chunk);
+            return false;
+        }
+
+        if (!raw.write(chunk)) {
+            parsed.writing = true;
+            raw.once("drain", () => {
+                parsed.writing = false;
+                if (parsed.writeQueue.length) parsed.writeLarge(parsed.writeQueue.shift());
+            });
+            return false;
+        } else {
+            if (parsed.writeQueue.length) parsed.writeLarge(parsed.writeQueue.shift());
+            return true;
+        }
+    }
+
     return parsed;
 }
 

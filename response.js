@@ -39,6 +39,11 @@ function parse(raw) {
         return parsed;
     }
 
+    parsed.nothing = () => {
+        raw.end();
+        return parsed;
+    };
+
     parsed.writeQueue = [];
     parsed.writing = false;
 
